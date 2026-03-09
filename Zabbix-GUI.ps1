@@ -115,11 +115,11 @@ $groupClient.Controls.Add($labelComputerName)
 $textComputerName = New-Object System.Windows.Forms.TextBox
 $textComputerName.Location = New-Object System.Drawing.Point(120, 25)
 $textComputerName.Size = New-Object System.Drawing.Size(410, 25)
-$textComputerName.Text = "DE401850M00023"
+$textComputerName.Text = "Computername"
 $groupClient.Controls.Add($textComputerName)
 
 $labelComputerInfo = New-Object System.Windows.Forms.Label
-$labelComputerInfo.Text = "> z.B. DE401850C00034, DE401850M00023, DE401850M00033"
+$labelComputerInfo.Text = "> z.B. Computername, Computername, Computername"
 $labelComputerInfo.Location = New-Object System.Drawing.Point(15, 50)
 $labelComputerInfo.Size = New-Object System.Drawing.Size(520, 20)
 $labelComputerInfo.Font = New-Object System.Drawing.Font("Segoe UI", 8)

@@ -312,7 +312,7 @@ if (-not $Credential) {
 
 # Computername abfragen
 Write-Host "Eingabe:" -ForegroundColor Yellow
-$Computer = Read-Host "Computername (z.B. DE401850M00033)"
+$Computer = Read-Host "Computername (z.B. Computername)"
 if (-not $Computer) {
     Write-Host "Fehler: Computername erforderlich!" -ForegroundColor Red
     exit 1

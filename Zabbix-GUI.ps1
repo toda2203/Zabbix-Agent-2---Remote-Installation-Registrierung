@@ -22,15 +22,15 @@ if (Test-Path $configPath) {
     }
 }
 
-$cfgDomain = if ($config.ContainsKey("Domain")) { $config.Domain } else { "de401850" }
-$cfgDomainAdminUser = if ($config.ContainsKey("DomainAdminUser")) { $config.DomainAdminUser } else { "admin.dt" }
+$cfgDomain = if ($config.ContainsKey("Domain")) { $config.Domain } else { "" }
+$cfgDomainAdminUser = if ($config.ContainsKey("DomainAdminUser")) { $config.DomainAdminUser } else { "" }
 $cfgDomainPassword = if ($config.ContainsKey("DomainPassword")) { $config.DomainPassword } else { $null }
 $cfgDomainUserName = if ([string]::IsNullOrWhiteSpace($cfgDomain)) { $cfgDomainAdminUser } else { "$cfgDomain\$cfgDomainAdminUser" }
 
-$cfgZabbixServer = if ($config.ContainsKey("ZabbixServer") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixServer)) { $config.ZabbixServer } else { "10.56.131.163" }
-$cfgZabbixApiUser = if ($config.ContainsKey("ZabbixApiUser") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixApiUser)) { $config.ZabbixApiUser } else { "Admin" }
-$cfgZabbixApiPassword = if ($config.ContainsKey("ZabbixApiPassword")) { $config.ZabbixApiPassword } else { "zabbix" }
-$cfgMsiPath = if ($config.ContainsKey("MsiPath") -and -not [string]::IsNullOrWhiteSpace($config.MsiPath)) { $config.MsiPath } else { "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi" }
+$cfgZabbixServer = if ($config.ContainsKey("ZabbixServer") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixServer)) { $config.ZabbixServer } else { "" }
+$cfgZabbixApiUser = if ($config.ContainsKey("ZabbixApiUser") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixApiUser)) { $config.ZabbixApiUser } else { "" }
+$cfgZabbixApiPassword = if ($config.ContainsKey("ZabbixApiPassword")) { $config.ZabbixApiPassword } else { "" }
+$cfgMsiPath = if ($config.ContainsKey("MsiPath") -and -not [string]::IsNullOrWhiteSpace($config.MsiPath)) { $config.MsiPath } else { "" }
 
 # ============================================
 # WINDOW SETUP

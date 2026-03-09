@@ -1,14 +1,14 @@
 @{
     # Netzwerk / Server
-    ZabbixServer = "10.56.131.163"
-    MsiPath = "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi"
+    ZabbixServer = "192.168.1.100"  # IP/Hostname deines Zabbix Servers
+    MsiPath = "\\server\share\zabbix_agent.msi"  # UNC-Pfad zur MSI-Datei
 
     # Zabbix API
-    ZabbixApiUser = "Admin"
-    ZabbixApiPassword = "zabbix"
+    ZabbixApiUser = "Admin"  # Zabbix Admin Benutzername
+    ZabbixApiPassword = "zabbix"  # Zabbix API Passwort
 
     # Domain / Remote Admin
-    Domain = "de401850"
-    DomainAdminUser = "admin.dt"
-    DomainPassword = ""  # Hier dein Domain-Passwort eintragen
+    Domain = "DEINEDOMAIN"  # Windows Domain Name
+    DomainAdminUser = "admin.benutzer"  # Domain Admin Benutzername
+    DomainPassword = ""  # Domain-Passwort (leer lassen für Abfrage beim Start)
 }

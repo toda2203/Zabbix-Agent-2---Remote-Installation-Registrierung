@@ -280,8 +280,8 @@ else {
     Write-Host "Hinweis: Keine Konfigurationsdatei gefunden ($ConfigPath), nutze Standardwerte." -ForegroundColor Yellow
 }
 
-$DomainName = if ($config.ContainsKey("Domain")) { $config.Domain } else { "de401850" }
-$DomainAdminUser = if ($config.ContainsKey("DomainAdminUser")) { $config.DomainAdminUser } else { "admin.dt" }
+$DomainName = if ($config.ContainsKey("Domain")) { $config.Domain } else { "" }
+$DomainAdminUser = if ($config.ContainsKey("DomainAdminUser")) { $config.DomainAdminUser } else { "" }
 $DomainPasswordFromConfig = if ($config.ContainsKey("DomainPassword")) { $config.DomainPassword } else { $null }
 
 $DomainUserName = if ([string]::IsNullOrWhiteSpace($DomainName)) { $DomainAdminUser } else { "$DomainName\$DomainAdminUser" }
@@ -294,8 +294,8 @@ if (-not $ZabbixAPIPassword -and $config.ContainsKey("ZabbixApiPassword") -and -
     $ZabbixAPIPassword = ConvertTo-SecureString -String $config.ZabbixApiPassword -AsPlainText -Force
 }
 
-$Server = if ($config.ContainsKey("ZabbixServer") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixServer)) { $config.ZabbixServer } else { "10.56.131.163" }
-$MSI = if ($config.ContainsKey("MsiPath") -and -not [string]::IsNullOrWhiteSpace($config.MsiPath)) { $config.MsiPath } else { "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi" }
+$Server = if ($config.ContainsKey("ZabbixServer") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixServer)) { $config.ZabbixServer } else { "" }
+$MSI = if ($config.ContainsKey("MsiPath") -and -not [string]::IsNullOrWhiteSpace($config.MsiPath)) { $config.MsiPath } else { "" }
 
 # Credentials abfragen
 if (-not $Credential) {

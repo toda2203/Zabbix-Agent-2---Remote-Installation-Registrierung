@@ -10,6 +10,28 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Konfiguration laden
+$configPath = Join-Path $PSScriptRoot "Zabbix-Config.psd1"
+$config = @{}
+if (Test-Path $configPath) {
+    try {
+        $config = Import-PowerShellDataFile -Path $configPath
+    }
+    catch {
+        $config = @{}
+    }
+}
+
+$cfgDomain = if ($config.ContainsKey("Domain")) { $config.Domain } else { "de401850" }
+$cfgDomainAdminUser = if ($config.ContainsKey("DomainAdminUser")) { $config.DomainAdminUser } else { "admin.dt" }
+$cfgDomainPassword = if ($config.ContainsKey("DomainPassword")) { $config.DomainPassword } else { $null }
+$cfgDomainUserName = if ([string]::IsNullOrWhiteSpace($cfgDomain)) { $cfgDomainAdminUser } else { "$cfgDomain\$cfgDomainAdminUser" }
+
+$cfgZabbixServer = if ($config.ContainsKey("ZabbixServer") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixServer)) { $config.ZabbixServer } else { "10.56.131.163" }
+$cfgZabbixApiUser = if ($config.ContainsKey("ZabbixApiUser") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixApiUser)) { $config.ZabbixApiUser } else { "Admin" }
+$cfgZabbixApiPassword = if ($config.ContainsKey("ZabbixApiPassword")) { $config.ZabbixApiPassword } else { "zabbix" }
+$cfgMsiPath = if ($config.ContainsKey("MsiPath") -and -not [string]::IsNullOrWhiteSpace($config.MsiPath)) { $config.MsiPath } else { "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi" }
+
 # ============================================
 # WINDOW SETUP
 # ============================================
@@ -45,7 +67,7 @@ $y += 35
 # SECTION: DOMAIN CREDENTIALS
 # ============================================
 $groupDomain = New-Object System.Windows.Forms.GroupBox
-$groupDomain.Text = "Domain Credentials (de401850\admin.dt)"
+$groupDomain.Text = "Domain Credentials ($cfgDomainUserName)"
 $groupDomain.Location = New-Object System.Drawing.Point(15, $y)
 $groupDomain.Size = New-Object System.Drawing.Size(555, 95)
 $form.Controls.Add($groupDomain)
@@ -60,10 +82,13 @@ $textDomainPwd = New-Object System.Windows.Forms.TextBox
 $textDomainPwd.Location = New-Object System.Drawing.Point(120, 25)
 $textDomainPwd.Size = New-Object System.Drawing.Size(410, 25)
 $textDomainPwd.PasswordChar = '*'
+if (-not [string]::IsNullOrWhiteSpace($cfgDomainPassword)) {
+    $textDomainPwd.Text = $cfgDomainPassword
+}
 $groupDomain.Controls.Add($textDomainPwd)
 
 $labelDomainInfo = New-Object System.Windows.Forms.Label
-$labelDomainInfo.Text = "> Benutzer: de401850\admin.dt"
+$labelDomainInfo.Text = "> Benutzer: $cfgDomainUserName"
 $labelDomainInfo.Location = New-Object System.Drawing.Point(15, 55)
 $labelDomainInfo.Size = New-Object System.Drawing.Size(520, 30)
 $labelDomainInfo.Font = New-Object System.Drawing.Font("Segoe UI", 8)
@@ -107,7 +132,7 @@ $y += 95
 # SECTION: ZABBIX CONFIGURATION
 # ============================================
 $groupZabbix = New-Object System.Windows.Forms.GroupBox
-$groupZabbix.Text = "Zabbix Server (Standard: 10.56.131.163)"
+$groupZabbix.Text = "Zabbix Server (aus Konfiguration)"
 $groupZabbix.Location = New-Object System.Drawing.Point(15, $y)
 $groupZabbix.Size = New-Object System.Drawing.Size(555, 120)
 $form.Controls.Add($groupZabbix)
@@ -121,7 +146,7 @@ $groupZabbix.Controls.Add($labelZabbixServer)
 $textZabbixServer = New-Object System.Windows.Forms.TextBox
 $textZabbixServer.Location = New-Object System.Drawing.Point(120, 25)
 $textZabbixServer.Size = New-Object System.Drawing.Size(410, 25)
-$textZabbixServer.Text = "10.56.131.163"
+$textZabbixServer.Text = $cfgZabbixServer
 $groupZabbix.Controls.Add($textZabbixServer)
 
 $labelZabbixUser = New-Object System.Windows.Forms.Label
@@ -133,7 +158,7 @@ $groupZabbix.Controls.Add($labelZabbixUser)
 $textZabbixUser = New-Object System.Windows.Forms.TextBox
 $textZabbixUser.Location = New-Object System.Drawing.Point(120, 53)
 $textZabbixUser.Size = New-Object System.Drawing.Size(410, 25)
-$textZabbixUser.Text = "Admin"
+$textZabbixUser.Text = $cfgZabbixApiUser
 $textZabbixUser.Enabled = $false
 $groupZabbix.Controls.Add($textZabbixUser)
 
@@ -147,7 +172,7 @@ $textZabbixPwd = New-Object System.Windows.Forms.TextBox
 $textZabbixPwd.Location = New-Object System.Drawing.Point(120, 81)
 $textZabbixPwd.Size = New-Object System.Drawing.Size(410, 25)
 $textZabbixPwd.PasswordChar = '*'
-$textZabbixPwd.Text = "zabbix"
+$textZabbixPwd.Text = $cfgZabbixApiPassword
 $groupZabbix.Controls.Add($textZabbixPwd)
 
 $y += 140
@@ -265,7 +290,7 @@ function Test-RemoteWinRMPrereq {
 }
 
 function Validate-Input {
-    if ([string]::IsNullOrWhiteSpace($textDomainPwd.Text)) {
+    if ([string]::IsNullOrWhiteSpace($textDomainPwd.Text) -and [string]::IsNullOrWhiteSpace($cfgDomainPassword)) {
         [System.Windows.Forms.MessageBox]::Show("Domain-Passwort erforderlich!", "Eingabe-Fehler", "OK", "Warning")
         return $false
     }
@@ -317,7 +342,15 @@ $buttonInstall.add_Click({
 
     $zabbixServer = $textZabbixServer.Text.Trim()
     $domainPwd = $textDomainPwd.Text
-    $zabbixPwd = if ([string]::IsNullOrWhiteSpace($textZabbixPwd.Text)) { "zabbix" } else { $textZabbixPwd.Text }
+    if ([string]::IsNullOrWhiteSpace($domainPwd)) {
+        $domainPwd = $cfgDomainPassword
+    }
+    $zabbixPwd = if ([string]::IsNullOrWhiteSpace($textZabbixPwd.Text)) { $cfgZabbixApiPassword } else { $textZabbixPwd.Text }
+    if ([string]::IsNullOrWhiteSpace($zabbixPwd)) {
+        $zabbixPwd = "zabbix"
+    }
+    $zabbixApiUser = $cfgZabbixApiUser
+    $msiSourcePath = $cfgMsiPath
 
     Add-Log "[INFO] Anzahl Computer: $($computers.Count)"
     Add-Log "[INFO] Computer: $($computers -join ', ')"
@@ -338,7 +371,7 @@ $buttonInstall.add_Click({
 
         try {
             $secPwd = ConvertTo-SecureString $domainPwd -AsPlainText -Force
-            $cred = New-Object System.Management.Automation.PSCredential("de401850\admin.dt", $secPwd)
+            $cred = New-Object System.Management.Automation.PSCredential($cfgDomainUserName, $secPwd)
 
             Add-Log "[0] Precheck DNS/WinRM..."
             $precheck = Test-RemoteWinRMPrereq -ComputerName $computer
@@ -378,7 +411,7 @@ $buttonInstall.add_Click({
 
             Add-Log ""
             Add-Log "[3] Kopiere MSI..."
-            Copy-Item -Path "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi" -Destination "\\$computer\C`$\Temp\zabbix_agent.msi" -Force
+            Copy-Item -Path $msiSourcePath -Destination "\\$computer\C`$\Temp\zabbix_agent.msi" -Force
             Add-Log "[OK] MSI kopiert"
 
             Add-Log ""
@@ -428,7 +461,7 @@ $buttonInstall.add_Click({
             Add-Log ""
             Add-Log "[6] Registriere Host auf Zabbix Server..."
             $apiURL = "http://$zabbixServer/zabbix/api_jsonrpc.php"
-            $loginBody = @{ jsonrpc = "2.0"; method = "user.login"; params = @{ username = "Admin"; password = $zabbixPwd }; id = 1 } | ConvertTo-Json
+            $loginBody = @{ jsonrpc = "2.0"; method = "user.login"; params = @{ username = $zabbixApiUser; password = $zabbixPwd }; id = 1 } | ConvertTo-Json
             $loginResp = Invoke-RestMethod -Uri $apiURL -Method Post -Body $loginBody -ContentType "application/json"
 
             if ($loginResp.error) {

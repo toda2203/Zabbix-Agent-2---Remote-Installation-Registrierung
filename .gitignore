@@ -1,3 +1,14 @@
+# Konfigurationsdateien mit echten Passwörtern
+Zabbix-Config.psd1
+
+# PowerShell
+*.ps1~
+*.swp
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Logs
 *.log
-secrets/
-*.tmp
+*.txt

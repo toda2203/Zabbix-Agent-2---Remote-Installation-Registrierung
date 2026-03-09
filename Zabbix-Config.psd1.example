@@ -1,0 +1,14 @@
+@{
+    # Netzwerk / Server
+    ZabbixServer = "10.56.131.163"
+    MsiPath = "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi"
+
+    # Zabbix API
+    ZabbixApiUser = "Admin"
+    ZabbixApiPassword = "zabbix"
+
+    # Domain / Remote Admin
+    Domain = "de401850"
+    DomainAdminUser = "admin.dt"
+    DomainPassword = ""  # Hier dein Domain-Passwort eintragen
+}

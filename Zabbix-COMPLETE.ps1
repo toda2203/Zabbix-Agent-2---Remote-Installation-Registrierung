@@ -30,7 +30,9 @@ param(
     
     [string]$HostGroup = "Windows clients",
     
-    [string]$Template = "Windows by Zabbix agent active Client PC"
+    [string]$Template = "Windows by Zabbix agent active Client PC",
+
+    [string]$ConfigPath = "$PSScriptRoot\Zabbix-Config.psd1"
 )
 
 Write-Host ""
@@ -99,109 +101,107 @@ function Register-ZabbixHost {
     Write-Host "  Hostname: $HostName"
     Write-Host "  IP: $HostIP"
     
-    try {
-        # Login
-        Write-Host "  [6a] API Login..." -ForegroundColor Gray
-        $authToken = Invoke-ZabbixAPI -URL $apiURL -Method "user.login" -Params @{
-            username = $APIUser
-            password = $APIPassword
-        }
+    $authToken = $null
+    
+    # Login
+    Write-Host "  [6a] API Login..." -ForegroundColor Gray
+    $authToken = Invoke-ZabbixAPI -URL $apiURL -Method "user.login" -Params @{
+        username = $APIUser
+        password = $APIPassword
+    }
+    
+    if (-not $authToken) {
+        Write-Host "  ✗ Login fehlgeschlagen!" -ForegroundColor Red
+        return $false
+    }
+    Write-Host "      ✓ Login erfolgreich" -ForegroundColor Green
+    
+    # Prüfe ob Host existiert
+    Write-Host "  [6b] Prüfe ob Host existiert..." -ForegroundColor Gray
+    $existingHost = Invoke-ZabbixAPI -URL $apiURL -Method "host.get" -Auth $authToken -Params @{
+        filter = @{ host = @($HostName) }
+    }
+    
+    if ($existingHost -and $existingHost.Count -gt 0) {
+        Write-Host "      ⚠ Host existiert bereits (ID: $($existingHost[0].hostid))" -ForegroundColor Yellow
+        Write-Host "      Aktualisiere Host-Status..." -ForegroundColor Gray
         
-        if (-not $authToken) {
-            Write-Host "  ✗ Login fehlgeschlagen!" -ForegroundColor Red
-            return $false
-        }
-        Write-Host "      ✓ Login erfolgreich" -ForegroundColor Green
-        
-        # Prüfe ob Host existiert
-        Write-Host "  [6b] Prüfe ob Host existiert..." -ForegroundColor Gray
-        $existingHost = Invoke-ZabbixAPI -URL $apiURL -Method "host.get" -Auth $authToken -Params @{
-            filter = @{ host = @($HostName) }
-        }
-        
-        if ($existingHost -and $existingHost.Count -gt 0) {
-            Write-Host "      ⚠ Host existiert bereits (ID: $($existingHost[0].hostid))" -ForegroundColor Yellow
-            Write-Host "      Aktualisiere Host-Status..." -ForegroundColor Gray
-            
-            $null = Invoke-ZabbixAPI -URL $apiURL -Method "host.update" -Auth $authToken -Params @{
-                hostid = $existingHost[0].hostid
-                status = 0
-            }
-            Write-Host "      ✓ Host reaktiviert" -ForegroundColor Green
-            
-            $null = Invoke-ZabbixAPI -URL $apiURL -Method "user.logout" -Auth $authToken
-            return $true
-        }
-        
-        # Hole/Erstelle Host Group
-        Write-Host "  [6c] Suche Host-Gruppe '$HostGroup'..." -ForegroundColor Gray
-        $groups = Invoke-ZabbixAPI -URL $apiURL -Method "hostgroup.get" -Auth $authToken -Params @{
-            filter = @{ name = @($HostGroup) }
-        }
-        
-        if (-not $groups -or $groups.Count -eq 0) {
-            Write-Host "      Host-Gruppe nicht gefunden, erstelle..." -ForegroundColor Gray
-            $newGroup = Invoke-ZabbixAPI -URL $apiURL -Method "hostgroup.create" -Auth $authToken -Params @{
-                name = $HostGroup
-            }
-            $groupId = $newGroup.groupids[0]
-            Write-Host "      ✓ Host-Gruppe erstellt (ID: $groupId)" -ForegroundColor Green
-        }
-        else {
-            $groupId = $groups[0].groupid
-            Write-Host "      ✓ Host-Gruppe gefunden (ID: $groupId)" -ForegroundColor Green
-        }
-        
-        # Hole Template (optional)
-        Write-Host "  [6d] Suche Template '$Template'..." -ForegroundColor Gray
-        $templates = Invoke-ZabbixAPI -URL $apiURL -Method "template.get" -Auth $authToken -Params @{
-            filter = @{ host = @($Template) }
-        }
-        
-        $templateId = $null
-        if ($templates -and $templates.Count -gt 0) {
-            $templateId = $templates[0].templateid
-            Write-Host "      ✓ Template gefunden (ID: $templateId)" -ForegroundColor Green
-        }
-        else {
-            Write-Host "      ⚠ Template nicht gefunden (wird übersprungen)" -ForegroundColor Yellow
-        }
-        
-        # Erstelle Host (OHNE Interface - Agent Active meldet sich selbst)
-        Write-Host "  [6e] Erstelle Host..." -ForegroundColor Gray
-        
-        $hostParams = @{
-            host = $HostName
-            name = $HostName
-            groups = @( @{ groupid = $groupId } )
+        $null = Invoke-ZabbixAPI -URL $apiURL -Method "host.update" -Auth $authToken -Params @{
+            hostid = $existingHost[0].hostid
             status = 0
         }
+        Write-Host "      ✓ Host reaktiviert" -ForegroundColor Green
         
-        if ($templateId) {
-            $hostParams.templates = @( @{ templateid = $templateId } )
-        }
-        
-        $newHost = Invoke-ZabbixAPI -URL $apiURL -Method "host.create" -Auth $authToken -Params $hostParams
-        
-        if ($newHost -and $newHost.hostids) {
-            Write-Host "      ✓ Host erfolgreich erstellt (ID: $($newHost.hostids[0]))" -ForegroundColor Green
-        }
-        else {
-            Write-Host "      ✗ Host-Erstellung fehlgeschlagen" -ForegroundColor Red
-            $null = Invoke-ZabbixAPI -URL $apiURL -Method "user.logout" -Auth $authToken
-            return $false
-        }
-        
-        # Logout
         $null = Invoke-ZabbixAPI -URL $apiURL -Method "user.logout" -Auth $authToken
-        
         Write-Host "  OK - Host auf Zabbix Server registriert!" -ForegroundColor Green
         return $true
     }
-    catch {
-        Write-Host "  FEHLER bei API-Registrierung: $_" -ForegroundColor Red
+    
+    # Hole/Erstelle Host Group
+    Write-Host "  [6c] Suche Host-Gruppe '$HostGroup'..." -ForegroundColor Gray
+    $groups = Invoke-ZabbixAPI -URL $apiURL -Method "hostgroup.get" -Auth $authToken -Params @{
+        filter = @{ name = @($HostGroup) }
+    }
+    
+    $groupId = $null
+    if (-not $groups -or $groups.Count -eq 0) {
+        Write-Host "      Host-Gruppe nicht gefunden, erstelle..." -ForegroundColor Gray
+        $newGroup = Invoke-ZabbixAPI -URL $apiURL -Method "hostgroup.create" -Auth $authToken -Params @{
+            name = $HostGroup
+        }
+        $groupId = $newGroup.groupids[0]
+        Write-Host "      ✓ Host-Gruppe erstellt (ID: $groupId)" -ForegroundColor Green
+    }
+    else {
+        $groupId = $groups[0].groupid
+        Write-Host "      ✓ Host-Gruppe gefunden (ID: $groupId)" -ForegroundColor Green
+    }
+    
+    # Hole Template (optional)
+    Write-Host "  [6d] Suche Template '$Template'..." -ForegroundColor Gray
+    $templates = Invoke-ZabbixAPI -URL $apiURL -Method "template.get" -Auth $authToken -Params @{
+        filter = @{ host = @($Template) }
+    }
+    
+    $templateId = $null
+    if ($templates -and $templates.Count -gt 0) {
+        $templateId = $templates[0].templateid
+        Write-Host "      ✓ Template gefunden (ID: $templateId)" -ForegroundColor Green
+    }
+    else {
+        Write-Host "      ⚠ Template nicht gefunden (wird übersprungen)" -ForegroundColor Yellow
+    }
+    
+    # Erstelle Host (OHNE Interface - Agent Active meldet sich selbst)
+    Write-Host "  [6e] Erstelle Host..." -ForegroundColor Gray
+    
+    $hostParams = @{
+        host = $HostName
+        name = $HostName
+        groups = @( @{ groupid = $groupId } )
+        status = 0
+    }
+    
+    if ($templateId) {
+        $hostParams.templates = @( @{ templateid = $templateId } )
+    }
+    
+    $newHost = Invoke-ZabbixAPI -URL $apiURL -Method "host.create" -Auth $authToken -Params $hostParams
+    
+    if ($newHost -and $newHost.hostids) {
+        Write-Host "      ✓ Host erfolgreich erstellt (ID: $($newHost.hostids[0]))" -ForegroundColor Green
+    }
+    else {
+        Write-Host "      ✗ Host-Erstellung fehlgeschlagen" -ForegroundColor Red
+        $null = Invoke-ZabbixAPI -URL $apiURL -Method "user.logout" -Auth $authToken
         return $false
     }
+    
+    # Logout
+    $null = Invoke-ZabbixAPI -URL $apiURL -Method "user.logout" -Auth $authToken
+    
+    Write-Host "  OK - Host auf Zabbix Server registriert!" -ForegroundColor Green
+    return $true
 }
 
 function Convert-SecureStringToPlainText {
@@ -265,10 +265,49 @@ function Test-RemoteWinRMPrereq {
 # HAUPTSKRIPT
 # ============================================
 
+# Konfiguration laden
+$config = @{}
+if (Test-Path $ConfigPath) {
+    try {
+        $config = Import-PowerShellDataFile -Path $ConfigPath
+        Write-Host "Konfiguration geladen: $ConfigPath" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Warnung: Konfigurationsdatei konnte nicht gelesen werden: $ConfigPath" -ForegroundColor Yellow
+    }
+}
+else {
+    Write-Host "Hinweis: Keine Konfigurationsdatei gefunden ($ConfigPath), nutze Standardwerte." -ForegroundColor Yellow
+}
+
+$DomainName = if ($config.ContainsKey("Domain")) { $config.Domain } else { "de401850" }
+$DomainAdminUser = if ($config.ContainsKey("DomainAdminUser")) { $config.DomainAdminUser } else { "admin.dt" }
+$DomainPasswordFromConfig = if ($config.ContainsKey("DomainPassword")) { $config.DomainPassword } else { $null }
+
+$DomainUserName = if ([string]::IsNullOrWhiteSpace($DomainName)) { $DomainAdminUser } else { "$DomainName\$DomainAdminUser" }
+
+if ($config.ContainsKey("ZabbixApiUser") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixApiUser)) {
+    $ZabbixAPIUser = $config.ZabbixApiUser
+}
+
+if (-not $ZabbixAPIPassword -and $config.ContainsKey("ZabbixApiPassword") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixApiPassword)) {
+    $ZabbixAPIPassword = ConvertTo-SecureString -String $config.ZabbixApiPassword -AsPlainText -Force
+}
+
+$Server = if ($config.ContainsKey("ZabbixServer") -and -not [string]::IsNullOrWhiteSpace($config.ZabbixServer)) { $config.ZabbixServer } else { "10.56.131.163" }
+$MSI = if ($config.ContainsKey("MsiPath") -and -not [string]::IsNullOrWhiteSpace($config.MsiPath)) { $config.MsiPath } else { "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi" }
+
 # Credentials abfragen
 if (-not $Credential) {
-    Write-Host "Domain-Credentials eingeben:" -ForegroundColor Yellow
-    $Credential = Get-Credential -UserName "de401850\admin.dt"
+    if (-not [string]::IsNullOrWhiteSpace($DomainPasswordFromConfig)) {
+        $credSecurePwd = ConvertTo-SecureString -String $DomainPasswordFromConfig -AsPlainText -Force
+        $Credential = New-Object System.Management.Automation.PSCredential($DomainUserName, $credSecurePwd)
+        Write-Host "Domain-Credentials aus Konfigurationsdatei geladen." -ForegroundColor Green
+    }
+    else {
+        Write-Host "Domain-Credentials eingeben:" -ForegroundColor Yellow
+        $Credential = Get-Credential -UserName $DomainUserName
+    }
 }
 
 # Computername abfragen
@@ -278,10 +317,6 @@ if (-not $Computer) {
     Write-Host "Fehler: Computername erforderlich!" -ForegroundColor Red
     exit 1
 }
-
-# Zabbix Server IP
-$Server = "10.56.131.163"
-$MSI = "\\bsserver\GROUPS\Ordner-Transfer\Installation\zabbix_agent.msi"
 
 # Zabbix API Passwort (falls Host registriert werden soll)
 $ZabbixAPIPwd = $null

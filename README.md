@@ -1,0 +1,1 @@
+# Zabbix-Agent-2---Remote-Installation-Registrierung

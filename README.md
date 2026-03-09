@@ -93,15 +93,102 @@ Zabbix-Agent-2---Remote-Installation-Registrierung/
 
 ## ⚙️ Konfigurationsparameter
 
-| Parameter | Beschreibung | Beispiel |
-|-----------|-------------|----------|
-| `ZabbixServer` | IP/Hostname des Zabbix Servers | `"192.168.1.123"` |
-| `MsiPath` | UNC-Pfad zur MSI-Datei | `"\\server\share\zabbix_agent.msi"` |
-| `ZabbixApiUser` | Zabbix API Benutzername | `"Admin"` |
-| `ZabbixApiPassword` | Zabbix API Passwort | `"zabbix"` |
-| `Domain` | Windows Domain | `"CONTOSO"` |
-| `DomainAdminUser` | Domain Admin Benutzername | `"admin"` |
-| `DomainPassword` | Domain Admin Passwort | `"*****"` |
+| Parameter | Beschreibung | Beispiel | Standard |
+|-----------|-------------|----------|----------|
+| `ZabbixServer` | IP/Hostname des Zabbix Servers | `"192.168.1.123"` | - |
+| `MsiPath` | UNC-Pfad zur MSI-Datei | `"\\server\share\zabbix_agent.msi"` | - |
+| `ZabbixApiUser` | Zabbix API Benutzername | `"Admin"` | `"Admin"` |
+| `ZabbixApiPassword` | Zabbix API Passwort | `"zabbix"` | - |
+| `Domain` | Windows Domain | `"CONTOSO"` | - |
+| `DomainAdminUser` | Domain Admin Benutzername | `"admin"` | - |
+| `DomainPassword` | Domain Admin Passwort | `"*****"` | - |
+
+### Zusätzliche Parameter (im Script, nicht in Config)
+
+Diese Parameter können direkt im Script angepasst werden:
+
+| Parameter | Beschreibung | Standard Wert | Ort im Script |
+|-----------|-------------|---------------|---------------|
+| `HostGroup` | Zabbix Host-Gruppe für neue Clients | `"Windows clients"` | Zeile ~378 |
+| `Template` | Zabbix Template für neue Clients | `"Windows by Zabbix agent active Client PC"` | Zeile ~379 |
+
+---
+
+## 🔌 Zabbix API Integration
+
+Die Scripts verwenden die **Zabbix JSON-RPC API 7.x** für die automatisierte Host-Registrierung.
+
+### API-Versionen
+
+| Version | Authentifizierung | Status |
+|---------|------------------|--------|
+| 7.0+ | Bearer Token (Authorization Header) | ✅ Unterstützt |
+| 6.0 LTS | Bearer Token (ab 6.0.8) | ✅ Unterstützt |
+| 5.0 LTS | Session-basiert (Cookie) | ⚠️ Nicht getestet |
+
+### API-Credentials in Config
+
+In `Zabbix-Config.psd1`:
+
+```powershell
+@{
+    ZabbixServer = "192.168.1.123"
+    ZabbixApiUser = "Admin"              # Zabbix Admin-Benutzer
+    ZabbixApiPassword = "zabbix"         # Admin-Passwort
+    # ...weitere Parameter...
+}
+```
+
+### Host-Gruppe (Standard: "Windows clients")
+
+Neue Clients werden in folgende Host-Gruppe aufgenommen:
+
+```
+"Windows clients"
+```
+
+**Host-Gruppe ID ermitteln (Zabbix Web UI):**
+- Admin → General → Host groups → "Windows clients" suchen → GroupID kopieren
+
+**Host-Gruppe ändern:**
+- **GUI (Zabbix-GUI.ps1)**, Zeile ~405: `groups = @( @{ groupid = <ID> } )`
+- **Console (Zabbix-COMPLETE.ps1)**, Parameter: `$HostGroup = "Neue Host-Gruppe"`
+
+### Template (Standard: "Windows by Zabbix agent active Client PC")
+
+Clients nutzen folgendes Template:
+
+```
+"Windows by Zabbix agent active Client PC"
+```
+
+**Template ID ermitteln (Zabbix Web UI):**
+- Admin → Templates → "Windows by Zabbix agent" suchen → Template ID kopieren
+
+**Template ändern:**
+- **GUI (Zabbix-GUI.ps1)**, Zeile ~406: `templates = @( @{ templateid = <ID> } )`
+- **Console (Zabbix-COMPLETE.ps1)**, Parameter: `$Template = "Neues Template"`
+
+### API Endpunkt
+
+```
+http://<ZabbixServer>/zabbix/api_jsonrpc.php
+```
+
+**Login-Prozess (automatisch):**
+1. `user.login` API-Call mit Admin-Credentials
+2. Erhält Bearer Token
+3. Token wird in `Authorization: Bearer <token>` Header verwendet
+4. `user.logout` nach Registrierung
+
+### Häufige API-Fehler
+
+| Fehler | Ursache | Lösung |
+|--------|--------|--------|
+| "Permission denied" | Admin-User hat keine API-Rechte | Zabbix Admin → Users → Permissions prüfen |
+| "No such user" | API-Username falsch | `ZabbixApiUser` in Config prüfen |
+| "No permissions to referred object" | Host-Gruppe nicht vorhanden | Host-Gruppe und GroupID prüfen |
+| "Invalid template" | Template existiert nicht | Template und TemplateID prüfen |
 
 ---
 

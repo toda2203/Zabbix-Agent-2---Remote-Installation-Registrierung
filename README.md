@@ -38,7 +38,7 @@ notepad Zabbix-Config.psd1
 ```powershell
 @{
     # Netzwerk / Server
-    ZabbixServer = "10.56.131.163"
+    ZabbixServer = "192.168.1.123"
     MsiPath = "\\server\share\zabbix_agent.msi"
 
     # Zabbix API
@@ -95,7 +95,7 @@ Zabbix-Agent-2---Remote-Installation-Registrierung/
 
 | Parameter | Beschreibung | Beispiel |
 |-----------|-------------|----------|
-| `ZabbixServer` | IP/Hostname des Zabbix Servers | `"10.56.131.163"` |
+| `ZabbixServer` | IP/Hostname des Zabbix Servers | `"192.168.1.123"` |
 | `MsiPath` | UNC-Pfad zur MSI-Datei | `"\\server\share\zabbix_agent.msi"` |
 | `ZabbixApiUser` | Zabbix API Benutzername | `"Admin"` |
 | `ZabbixApiPassword` | Zabbix API Passwort | `"zabbix"` |
@@ -237,7 +237,7 @@ PC-OFFICE-01, PC-OFFICE-02, PC-LABOR-05, PC-LAGER-10
 ```powershell
 # Zabbix-Config.psd1 (ohne Passwörter)
 @{
-    ZabbixServer = "10.56.131.163"
+    ZabbixServer = "192.168.1.123"
     Domain = "FIRMA"
     DomainAdminUser = "admin.zabbix"
     DomainPassword = ""  # Leer lassen → wird abgefragt

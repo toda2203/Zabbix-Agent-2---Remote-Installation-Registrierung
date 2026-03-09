@@ -100,7 +100,7 @@ Zabbix-Agent-2---Remote-Installation-Registrierung/
 | `ZabbixApiUser` | Zabbix API Benutzername | `"Admin"` |
 | `ZabbixApiPassword` | Zabbix API Passwort | `"zabbix"` |
 | `Domain` | Windows Domain | `"CONTOSO"` |
-| `DomainAdminUser` | Domain Admin Benutzername | `"admin.dt"` |
+| `DomainAdminUser` | Domain Admin Benutzername | `"admin"` |
 | `DomainPassword` | Domain Admin Passwort | `"*****"` |
 
 ---

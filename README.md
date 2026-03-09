@@ -93,15 +93,24 @@ Zabbix-Agent-2---Remote-Installation-Registrierung/
 
 ## ⚙️ Konfigurationsparameter
 
-| Parameter | Beschreibung | Beispiel |
-|-----------|-------------|----------|
-| `ZabbixServer` | IP/Hostname des Zabbix Servers | `"10.56.131.163"` |
-| `MsiPath` | UNC-Pfad zur MSI-Datei | `"\\server\share\zabbix_agent.msi"` |
-| `ZabbixApiUser` | Zabbix API Benutzername | `"Admin"` |
-| `ZabbixApiPassword` | Zabbix API Passwort | `"zabbix"` |
-| `Domain` | Windows Domain | `"CONTOSO"` |
-| `DomainAdminUser` | Domain Admin Benutzername | `"admin.dt"` |
-| `DomainPassword` | Domain Admin Passwort | `"*****"` |
+| Parameter | Beschreibung | Beispiel | Standard |
+|-----------|-------------|----------|----------|
+| `ZabbixServer` | IP/Hostname des Zabbix Servers | `"10.56.131.163"` | - |
+| `MsiPath` | UNC-Pfad zur MSI-Datei | `"\\server\share\zabbix_agent.msi"` | - |
+| `ZabbixApiUser` | Zabbix API Benutzername | `"Admin"` | `"Admin"` |
+| `ZabbixApiPassword` | Zabbix API Passwort | `"zabbix"` | - |
+| `Domain` | Windows Domain | `"CONTOSO"` | - |
+| `DomainAdminUser` | Domain Admin Benutzername | `"admin.dt"` | - |
+| `DomainPassword` | Domain Admin Passwort | `"*****"` | - |
+
+### Zusätzliche Parameter (im Script, nicht in Config)
+
+Diese Parameter können direkt im Script angepasst werden:
+
+| Parameter | Beschreibung | Aktueller Wert | Ort |
+|-----------|-------------|----------------|-----|
+| `HostGroup` | Zabbix Host-Gruppe für neue Clients | `"Windows clients"` | GUI: ~405, Console: ~315 |
+| `Template` | Zabbix Template für neue Clients | `"Windows by Zabbix agent active Client PC"` | GUI: ~406, Console: ~316 |
 
 ---
 
@@ -155,7 +164,160 @@ New-NetFirewallRule -DisplayName "WinRM HTTP" -Direction Inbound -LocalPort 5985
 
 ---
 
-## 🛠️ Troubleshooting
+## � Zabbix API Integration
+
+Die Scripts verwenden die **Zabbix JSON-RPC API 7.x** für die automatisierte Host-Registrierung.
+
+### API-Versionen
+
+| Version | Authentifizierung | Status |
+|---------|------------------|--------|
+| 7.0+ | Bearer Token (Authorization Header) | ✅ Unterstützt |
+| 6.0 LTS | Bearer Token (ab 6.0.8) | ✅ Unterstützt |
+| 5.0 LTS | Session-basiert (Cookie) | ⚠️ Nicht getestet |
+
+### API-Credentials konfigurieren
+
+In `Zabbix-Config.psd1`:
+
+```powershell
+@{
+    ZabbixServer = "10.56.131.163"
+    ZabbixApiUser = "Admin"              # Zabbix Admin-Benutzer
+    ZabbixApiPassword = "zabbix"         # Admin-Passwort
+    # ...weitere Parameter...
+}
+```
+
+**Wichtig:** Der API-Benutzername kann auch ein Service-Account sein:
+```powershell
+ZabbixApiUser = "zabbix_api_user"
+ZabbixApiPassword = "SuperSecurePassword"
+```
+
+### API-Endpunkt
+
+Die Scripts verbinden sich zum Zabbix API-Endpunkt:
+
+```
+http://<ZabbixServer>/zabbix/api_jsonrpc.php
+```
+
+**Login-Prozess:**
+1. `user.login` → Erhält API Token
+2. Token wird in `Authorization: Bearer <token>` Header verwendet
+3. `user.logout` → Token wird ungültig gemacht
+
+### Host-Registrierung Details
+
+#### 1️⃣ Standard Host-Gruppe
+
+Die Clients werden in diese Host-Gruppe registriert:
+
+```
+"Windows clients"
+```
+
+**Anpassen:** Parameter in den Scripts ändern
+- **GUI**: Zeile ~405 (Hard-codiert auf `groupid = 59`)
+- **Console**: Parameter `$HostGroup = "Windows clients"`
+
+#### 2️⃣ Standard Template
+
+Die Clients nutzen folgendes Zabbix Template:
+
+```
+"Windows by Zabbix agent active Client PC"
+```
+
+**Anpassen:** Parameter in den Scripts ändern
+- **GUI**: Zeile ~406 (Hard-codiert auf `templateid = 11062`)
+- **Console**: Parameter `$Template = "Windows by Zabbix agent active Client PC"`
+
+**⚠️ Hinweis:** Die Template-ID und Group-ID müssen in deiner Zabbix-Installation überprüft werden!
+
+#### 3️⃣ Host-Registrierung Ablauf
+
+Der technische Ablauf:
+
+```
+[1] Login
+    → user.login mit Admin-Credentials
+
+[2] Prüfe existierenden Host
+    → Wenn Host lebt → Status auf "monitored" (0)
+    → Wenn Host tot → Aktualisiere und rückkehr
+
+[3] Hole Host-Gruppe
+    → Suche nach Gruppen-ID
+    → Erstelle falls nicht vorhanden
+
+[4] Hole Template
+    → Suche nach Template-ID
+    → Optional (kann leer sein)
+
+[5] Erstelle Host
+    → host.create API-Call
+    → Mit Gruppe, Template, Status=0 (monitored)
+    → Hostnamen aus Computername
+
+[6] Logout
+    → user.logout API-Call
+```
+
+### Template-ID und Group-ID ermitteln
+
+Falls die Standard-IDs nicht funktionieren, musst du deine IDs ermitteln:
+
+**Via Zabbix Web UI:**
+1. Admin → General
+2. Host groups → Name suchen → ID auslesen
+3. Templates → Template suchen → ID auslesen
+
+**Via PowerShell/API:**
+```powershell
+# Host-Gruppen auflisten
+$body = @{
+    jsonrpc = "2.0"
+    method = "hostgroup.get"
+    params = @{ output = @("groupid", "name") }
+    id = 1
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://<server>/zabbix/api_jsonrpc.php" `
+    -Method Post -Body $body -ContentType "application/json"
+```
+
+**Danach in Scripts anpassen:**
+
+```powershell
+# Zabbix-GUI.ps1 Zeile ~405
+groups = @( @{ groupid = 59 } )          # Deine Group-ID
+
+# Zabbix-GUI.ps1 Zeile ~406
+templates = @( @{ templateid = 11062 } ) # Dein Template-ID
+```
+
+### API Error Handling
+
+Die Scripts zeigen detaillierte API-Fehlermeldungen:
+
+```
+[ERROR] API Error: Permissions denied. (Code: -32500)
+[ERROR] API Error: No permissions to referred object or it does not exist! (Code: -32602)
+```
+
+**Häufige Fehler:**
+
+| Fehler | Ursache | Lösung |
+|--------|--------|--------|
+| "Permission denied" | Admin-User hat keine API-Rechte | Zabbix Admin → Users → Permissions prüfen |
+| "No such user" | API-Username falsch | Benutzername in Config korrekt? |
+| "Invalid token" | Session abgelaufen | Selten, Token wird direkt nach Login erzeugt |
+
+---
+
+## �🛠️ Troubleshooting
 
 ### ❌ Fehler: "WinRM Port 5985 nicht erreichbar"
 
